@@ -1,6 +1,6 @@
 // ============================================================================
 // 여비 계산기 — 클라이언트 로직
-// 거리: 카카오 로컬(키워드) API로 좌표 조회 → 하버사인 공식으로 직선 최소거리
+// 거리: 카카오 로컬(키워드) API 프록시(/api/kakao)로 좌표 조회 → 하버사인 공식으로 직선 최소거리
 // 유가: /api/opinet (Vercel Function, 오피넷 무료 API 프록시)
 // 공식: 유류비 = 거리(km) × (왕복 시 ×2) ÷ 연비(km/L) × 유가(원/L)
 // ============================================================================
@@ -19,11 +19,6 @@ const OPINET_PRODUCT = {
 };
 
 const els = {
-  settingsToggle: document.getElementById("settingsToggle"),
-  settingsPanel: document.getElementById("settingsPanel"),
-  kakaoKeyInput: document.getElementById("kakaoKey"),
-  saveKeyBtn: document.getElementById("saveKey"),
-
   form: document.getElementById("calcForm"),
   tripDate: document.getElementById("tripDate"),
   fuelType: document.getElementById("fuelType"),
@@ -45,47 +40,6 @@ const els = {
   valTrip: document.getElementById("valTrip"),
   valTotal: document.getElementById("valTotal"),
 };
-
-// ---------------------------------------------------------------------------
-// 설정 패널 (카카오 REST API 키, localStorage에만 저장)
-// ---------------------------------------------------------------------------
-const KAKAO_KEY_STORAGE = "yeobi_kakao_rest_key";
-
-function loadKakaoKey() {
-  const saved = localStorage.getItem(KAKAO_KEY_STORAGE) || "";
-  els.kakaoKeyInput.value = saved;
-  return saved;
-}
-
-els.settingsToggle.addEventListener("click", () => {
-  const expanded = els.settingsToggle.getAttribute("aria-expanded") === "true";
-  els.settingsToggle.setAttribute("aria-expanded", String(!expanded));
-  els.settingsPanel.hidden = expanded;
-});
-
-els.saveKeyBtn.addEventListener("click", () => {
-  const val = els.kakaoKeyInput.value.trim();
-  localStorage.setItem(KAKAO_KEY_STORAGE, val);
-  flashMsg(els.settingsPanel, val ? "저장되었습니다." : "키를 입력해 주세요.");
-});
-
-function flashMsg(container, text) {
-  let el = container.querySelector(".flash");
-  if (!el) {
-    el = document.createElement("p");
-    el.className = "flash";
-    el.style.cssText = "margin:8px 2px 0;font-size:12px;color:#4FA88F;";
-    container.appendChild(el);
-  }
-  el.textContent = text;
-  setTimeout(() => { el.textContent = ""; }, 2500);
-}
-
-loadKakaoKey();
-if (!loadKakaoKey()) {
-  els.settingsPanel.hidden = false;
-  els.settingsToggle.setAttribute("aria-expanded", "true");
-}
 
 // ---------------------------------------------------------------------------
 // 주소/장소 검색 (카카오 로컬 키워드 검색 API)
@@ -116,22 +70,14 @@ function setupSearch(inputEl, suggestEl, stateKey) {
 }
 
 async function searchKakao(query, suggestEl, inputEl, stateKey) {
-  const key = localStorage.getItem(KAKAO_KEY_STORAGE);
-  if (!key) {
-    suggestEl.hidden = true;
-    return;
-  }
   try {
-    const res = await fetch(
-      `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=6`,
-      { headers: { Authorization: `KakaoAK ${key}` } }
-    );
-    if (!res.ok) throw new Error(`카카오 API 오류 (${res.status})`);
+    const res = await fetch(`/api/kakao?query=${encodeURIComponent(query)}`);
+    if (!res.ok) throw new Error(`검색 API 오류 (${res.status})`);
     const data = await res.json();
     renderSuggestions(data.documents || [], suggestEl, inputEl, stateKey);
   } catch (err) {
     console.error(err);
-    suggestEl.innerHTML = `<button type="button" disabled>검색 실패 — 카카오 키를 확인하세요</button>`;
+    suggestEl.innerHTML = `<button type="button" disabled>검색 실패</button>`;
     suggestEl.hidden = false;
   }
 }
@@ -170,14 +116,9 @@ async function resolvePoint(inputEl, stateKey) {
   if (state[stateKey]) return state[stateKey];
   const query = inputEl.value.trim();
   if (!query) throw new Error("주소를 입력해 주세요.");
-  const key = localStorage.getItem(KAKAO_KEY_STORAGE);
-  if (!key) throw new Error("설정에서 카카오 REST API 키를 먼저 등록해 주세요.");
 
-  const res = await fetch(
-    `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=1`,
-    { headers: { Authorization: `KakaoAK ${key}` } }
-  );
-  if (!res.ok) throw new Error("카카오 검색에 실패했습니다. 키를 확인해 주세요.");
+  const res = await fetch(`/api/kakao?query=${encodeURIComponent(query)}`);
+  if (!res.ok) throw new Error("장소 검색에 실패했습니다.");
   const data = await res.json();
   const first = (data.documents || [])[0];
   if (!first) throw new Error(`"${query}"에 대한 검색 결과가 없습니다.`);
