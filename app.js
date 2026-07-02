@@ -11,7 +11,6 @@ const MILEAGE = {
   lpg:      { label: "LPG(자동차용부탄)", value: 8.83 },
 };
 
-// 오피넷 avgAllPrice 응답의 PRODCD 매핑 (코드 우선, 실패 시 이름으로 재탐색)
 const OPINET_PRODUCT = {
   gasoline: { code: "B027", nameIncludes: ["휘발유"], nameExcludes: ["고급"] },
   diesel:   { code: "D047", nameIncludes: ["경유"] },
@@ -42,18 +41,18 @@ const els = {
 };
 
 // ---------------------------------------------------------------------------
-// 주소/장소 검색 (카카오 로컬 키워드 검색 API)
+// 주소/장소 검색 (카카오 로컬 키워드 검색 API 프록시)
 // ---------------------------------------------------------------------------
 const state = {
-  origin: null,      // { name, lat, lng }
-  destination: null, // { name, lat, lng }
+  origin: null,
+  destination: null,
 };
 
 function setupSearch(inputEl, suggestEl, stateKey) {
   let debounceTimer = null;
 
   inputEl.addEventListener("input", () => {
-    state[stateKey] = null; // 사용자가 다시 타이핑하면 선택값 초기화
+    state[stateKey] = null;
     clearTimeout(debounceTimer);
     const query = inputEl.value.trim();
     if (query.length < 2) {
@@ -111,7 +110,6 @@ function renderSuggestions(items, suggestEl, inputEl, stateKey) {
 setupSearch(els.origin, els.originSuggest, "origin");
 setupSearch(els.destination, els.destSuggest, "destination");
 
-// 선택하지 않고 바로 제출한 경우: 입력값으로 1회 검색해 첫 결과를 사용
 async function resolvePoint(inputEl, stateKey) {
   if (state[stateKey]) return state[stateKey];
   const query = inputEl.value.trim();
@@ -230,7 +228,6 @@ function renderResult(r) {
   els.resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-// 결과 카드의 경로 시각화 — 거리값을 0~560km 범위로 시각적 스케일링
 function animateRoute(distanceKm) {
   const startX = 40, endXMax = 600;
   const scale = Math.min(distanceKm / 560, 1);
